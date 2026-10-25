@@ -1,0 +1,25 @@
+# Keil 编译产物
+Objects/
+Listings/
+Debug/
+DebugConfig/
+Release/
+*.uvguix.*
+*.o
+*.d
+*.axf
+*.map
+*.htm
+*.lnp
+*.bak
+*.uvoptx.bak
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+JLinkLog.txt
