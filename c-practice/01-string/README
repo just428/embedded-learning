@@ -1,0 +1,92 @@
+# 01 字符串四个基础函数
+
+## 题目
+
+不 `#include <string.h>`，不用任何库函数，自己实现下面四个函数：
+
+```c
+size_t my_strlen(const char *s);            // 返回字符串长度（不含结尾 \0）
+char  *my_strcpy(char *dst, const char *src); // 把 src 拷到 dst，返回 dst
+int    my_strcmp(const char *a, const char *b); // a<b 返回负数, 相等 0, a>b 正数
+char  *my_strcat(char *dst, const char *src);   // 把 src 接到 dst 末尾, 返回 dst
+```
+
+然后写 `main` 用下面这段测试，跑出来和「预期输出」一字不差就算过。
+
+## 测试 main（直接用）
+
+```c
+#include <stdio.h>
+
+/* 这里放你自己写的四个函数 */
+
+int main(void) {
+    char buf[64];
+    char *r;
+
+    printf("strlen(\"hello\") = %u\n", (unsigned)my_strlen("hello"));
+
+    my_strcpy(buf, "hello");
+    printf("after strcpy buf=\"%s\"\n", buf);
+
+    printf("strcmp(\"abc\",\"abc\") = %d\n", my_strcmp("abc", "abc"));
+    printf("strcmp(\"abc\",\"abd\") = %d\n", my_strcmp("abc", "abd"));
+    printf("strcmp(\"abd\",\"abc\") = %d\n", my_strcmp("abd", "abc"));
+
+    r = my_strcat(buf, " world");
+    printf("after strcat buf=\"%s\" ret=\"%s\"\n", buf, r);
+
+    return 0;
+}
+```
+
+## 预期输出（逐字对照）
+
+```
+strlen("hello") = 5
+after strcpy buf="hello"
+strcmp("abc","abc") = 0
+strcmp("abc","abd") = -1
+strcmp("abd","abc") = 1
+after strcat buf="hello world" ret="hello world"
+```
+
+## 易错点（写完对照看，别提前看）
+
+- `my_strcmp` 别只返回 -1/1，**要返回正数/负数**，题目才有意义；标准做法是相减或首字符差
+- `my_strcpy` / `my_strcat` 必须**把结尾 `\0` 也拷过去**，否则下一个字符串会乱
+- `my_strcat` 要先找到 dst 的结尾 `\0` 再追加，注意返回值是 dst 起点（不是追加后位置）
+- 形参用 `const char *`：告诉编译器你不会改它，也是面试加分细节
+- 空指针没要求处理，但心里要知道真实工程里要先判空
+
+## 提交标准
+
+自己写 → 跑通 → 输出完全一致 → 把 `.c` 存为 `01-string/string.c`。（等 GitHub 建好后这个目录整体 push）
+
+## 卡住了看这里（辅助，不是答案）
+
+### 核心模型（四个函数全靠它）
+字符串 = 内存里一连串 `char`，结尾是值为 0 的字节 `'\0'`。所有操作 = 指针从头走到尾，遇到 0 停。
+
+```
+内存:  [ 'h' ][ 'e' ][ 'l' ][ 'l' ][ 'o' ][ '\0' ]
+指针 p 从第一个字符出发，每走一格 +1，看到 '\0' 停下，走过的格数 = 长度。
+```
+
+### my_strlen 脚手架（只差一行，填了就能跑）
+```c
+size_t my_strlen(const char *s) {
+    const char *p = s;
+    while ( /* 填：当前字符还不是 '\0'，即 *p != '\0' 或简写 *p */ ) {
+        p++;
+    }
+    return (size_t)(p - s);
+}
+```
+
+### 其余三个的"同一招"配方（自己写，不是代码）
+- **my_strcpy**：从头走，把 `*src` 逐个拷到 `*dst`，**把最后的 `\0` 也拷过去**，返回 `dst`
+- **my_strcmp**：`a`、`b` 同时走，当前字符不同就返回 `*a - *b`；都走到 `\0` 才返回 0
+- **my_strcat**：先用 strlen 思路把指针走到 `dst` 的 `\0`，再从那儿把 `src` 整个拷过来（即 strcpy 逻辑）
+
+> 实在一步都迈不动，再回来问我，我给你完整带注释版。但先试着填那一行、拼出 strlen。
