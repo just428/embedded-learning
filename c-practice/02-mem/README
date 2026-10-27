@@ -1,0 +1,138 @@
+# 02 memcpy 与 memmove（内存重叠）
+
+## 题目
+
+不 `#include <string.h>`，不用任何库函数，自己实现两个按字节搬运内存的函数：
+
+```c
+void *my_memcpy (void *dst, const void *src, size_t n);  // 朴素版：从前往后逐字节拷
+void *my_memmove(void *dst, const void *src, size_t n);  // 安全版：内存重叠也能拷对
+```
+
+要求：
+
+1. `my_memcpy` 用**最简单的从前往后**写法（我故意让你这么写，待会儿测试会把它打脸）
+2. `my_memmove` 必须能处理 `dst` 和 `src` **区域重叠**的情况
+3. 两个函数都返回 `dst` 的原值
+4. `n` 是**字节数**，不是元素个数
+
+## 测试 main（直接用）
+
+```c
+#include <stdio.h>
+/* 不用 string.h —— 别偷懒 */
+
+/* 这里放你自己写的两个函数 */
+
+int main(void) {
+    char b1[32] = "abcdef";
+    char b2[32] = "abcdef";
+    char b3[32] = "abcdef";
+
+    my_memcpy (b1 + 2, b1, 4);   // 目标区在后，和源重叠！
+    printf("[naive] %s\n", b1);
+
+    my_memmove(b2 + 2, b2, 4);   // 同一个重叠场景
+    printf("[move ] %s\n", b2);
+
+    my_memmove(b3, b3 + 2, 4);   // 目标区在前，反方向重叠
+    printf("[back ] %s\n", b3);
+
+    char s[16] = "hello", d[16] = "XXXXXXXX";
+    my_memcpy(d, s, 6);          // 不重叠，拷 6 字节（含 '\0'）
+    printf("[copy ] %s\n", d);
+
+    int a[5] = {10,20,30,40,50}, t[5] = {0};
+    my_memmove(t, a, sizeof(a)); // 一次搬 20 字节
+    printf("[ints ] ");
+    for (int i = 0; i < 5; i++) printf("%d ", t[i]);
+    printf("\n");
+
+    return 0;
+}
+```
+
+## 预期输出（逐字对照）
+
+```
+[naive] ababab
+[move ] ababcd
+[back ] cdefef
+[copy ] hello
+[ints ] 10 20 30 40 50
+```
+
+> `[naive]` 那行输出 `ababab` 是**故意的正确答案**——它证明朴素写法在重叠时会读脏数据。
+> 如果你那行打出来是 `ababcd`，说明你写的不是"从前往后"，回去检查循环方向。
+
+## 三条军规（写完对照看）
+
+- `void *` **不能解引用、不能做算术**（`*p`、`p++` 都编译不过）→ 先转 `char *` 按字节走
+- 拷贝的单位是**字节**，`n` 是字节数；拷 int 数组时外面传 `sizeof(a)`
+- 重叠判定不看"会不会重叠"，只看**拷贝方向**：目标区在源区**后面**（`dst > src`）时要从后往前拷
+
+## 提交标准
+
+自己写 → 跑通 → 输出完全一致 → 存为 `02-mem/mem.c`。
+
+---
+
+## 卡住了看这里（辅助，不是答案）
+
+### 为什么会出现 `ababab`
+
+```
+源      buf[0] buf[1] buf[2] buf[3] buf[4] buf[5]
+           a      b      c      d      e      f
+目标            buf[2] buf[3] buf[4] buf[5]        （dst = buf+2，拷 4 字节）
+
+第1步 buf[2] = buf[0]  →  a b a d e f     buf[2] 已经被覆盖成 'a'
+第2步 buf[3] = buf[1]  →  a b a b e f
+第3步 buf[4] = buf[2]  →  读到的不是原来的 'c'，是刚写进去的 'a' ← 脏数据
+第4步 buf[5] = buf[3]  →  同样读到刚写进去的 'b'
+结果：a b a b a b
+```
+
+反过来 `dst < src`（源在后）时，从前往后是安全的；这时**从后往前**才会踩同样的坑。
+所以 memmove 就是一层方向判断。
+
+### my_memcpy 骨架（填两行）
+
+```c
+void *my_memcpy(void *dst, const void *src, size_t n) {
+    char       *d = (char *)dst;
+    const char *s = (const char *)src;
+    for (size_t i = 0; i < n; i++) {
+        /* 填：把 s 的第 i 个字节拷给 d 的第 i 个字节 */
+    }
+    return dst;
+}
+```
+
+### my_memmove 的判断条件（自己翻译成代码）
+
+```
+如果 d <= s（目标在源前面）或者两块根本不重叠：
+    照抄 my_memcpy 的从前往后
+否则（目标在源后面，会踩到自己的尾巴）：
+    反过来从 i = n-1 走到 0
+```
+
+> 先用两次 `my_memcpy` 的思路把 `buf+2 ← buf` 和 `buf ← buf+2` 都跑通（一个正序一个倒序），
+> 再把"什么时候用哪种"抽成一个 if，memmove 就成了。
+> 还是一步都迈不动，回来问我。
+
+### 倒序循环的经典坑（先知道，别踩了再问）
+
+```c
+size_t i;
+for (i = n - 1; i >= 0; i--)   // 死循环！size_t 是无符号，i>=0 永远成立，减到 0 再减变巨大值
+```
+
+正确写法（两种任选）：
+
+```c
+for (size_t i = n; i > 0; i--) { size_t k = i - 1; d[k] = s[k]; }  // 用 i 当哨兵
+while (n--) { d[n] = s[n]; }                                       // 最简
+```
+
